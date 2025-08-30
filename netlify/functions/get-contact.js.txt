@@ -1,0 +1,76 @@
+export default async (request, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers });
+  }
+
+  try {
+    const { contactName } = await request.json();
+    
+    if (!contactName || contactName.length < 2) {
+      throw new Error('Contact name must be at least 2 characters');
+    }
+
+    // Sanitize input - remove special characters that could break SOQL
+    const sanitizedName = contactName.replace(/['"\\]/g, '').trim();
+
+    const authResponse = await fetch(`${request.url.origin}/.netlify/functions/salesforce-auth`, {
+      method: 'POST'
+    });
+    
+    const authData = await authResponse.json();
+    
+    if (!authData.success) {
+      throw new Error(`Authentication failed: ${authData.error}`);
+    }
+
+    console.log(`Searching for contact: ${sanitizedName}`);
+
+    // Use SOSL (Salesforce Object Search Language) instead of SOQL for safer text searching
+    const searchQuery = `FIND {${sanitizedName}*} IN NAME FIELDS RETURNING Contact(Id, Name, Email, Account.Name) LIMIT 10`;
+    const searchUrl = `${authData.instance_url}/services/data/v59.0/search/?q=${encodeURIComponent(searchQuery)}`;
+
+    const contactResponse = await fetch(searchUrl, {
+      headers: {
+        'Authorization': `${authData.token_type} ${authData.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!contactResponse.ok) {
+      const errorData = await contactResponse.json();
+      throw new Error(`Salesforce search failed: ${errorData[0]?.message || 'Unknown error'}`);
+    }
+
+    const searchData = await contactResponse.json();
+    const contacts = searchData.searchRecords || [];
+
+    console.log(`Found ${contacts.length} contacts matching "${sanitizedName}"`);
+
+    return new Response(JSON.stringify({
+      success: true,
+      contacts: contacts,
+      totalSize: contacts.length
+    }), {
+      status: 200,
+      headers
+    });
+
+  } catch (error) {
+    console.error('Contact search error:', error.message);
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message
+    }), {
+      status: 500,
+      headers
+    });
+  }
+};

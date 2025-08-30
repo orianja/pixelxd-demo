@@ -1,0 +1,2006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelXD: Customer Journey Animation Platform</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+   
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FontLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/geometries/TextGeometry.js"></script>
+
+
+
+
+    <style>
+        /* Basic Reset and Font */
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+        }
+
+
+        /* Full-screen container for the 3D scene */
+        #scene-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+
+        /* Overlay Screens (Start and Loading) */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(26, 26, 26, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 100;
+            transition: opacity 0.7s ease-in-out;
+        }
+
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+
+        .overlay h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+
+        .overlay p {
+            font-size: clamp(1rem, 2.5vw, 1.5rem);
+            margin-bottom: 2.5rem;
+            max-width: 80%;
+            color: #ccc;
+        }
+
+
+        .overlay button {
+            padding: 15px 35px;
+            font-size: clamp(1rem, 2vw, 1.2rem);
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            font-weight: 500;
+        }
+
+
+        .overlay button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+
+
+        /* Loading Bar for Asset Loading */
+        #loading-bar-container {
+            width: 60%;
+            max-width: 400px;
+            height: 8px;
+            background-color: #444;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 1.5rem;
+        }
+
+
+        #loading-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #007bff;
+            transition: width 0.3s ease;
+        }
+       
+        #loading-text {
+            margin-top: 1rem;
+            font-size: 1rem;
+            color: #aaa;
+        }
+
+
+        /* Main UI Overlay for Controls */
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            box-sizing: border-box;
+            z-index: 50;
+        }
+
+
+        #top-ui {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap; /* Allow wrapping for smaller screens */
+        }
+
+
+        #journey-title {
+            display: none; /* Hidden as requested */
+            font-size: clamp(1.2rem, 3vw, 1.8rem);
+            font-weight: 500;
+            background-color: rgba(0, 0, 0, 0.3);
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+       
+        #journey-switcher {
+            pointer-events: all;
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+
+        #data-overlay {
+            position: absolute; /* Absolute positioning for dynamic placement */
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            max-width: 350px;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            display: flex;
+            flex-direction: column; /* Stack data items vertically */
+            gap: 5px; /* Smaller gap for stacked items */
+            pointer-events: none; /* Ensure it doesn't block clicks */
+            transform: translateX(-50%); /* Center horizontally via JS */
+            z-index: 60; /* Above other UI elements */
+        }
+
+
+        #data-overlay.visible {
+            opacity: 1;
+        }
+
+
+        #data-overlay p {
+            margin: 0;
+            opacity: 0;
+        }
+
+
+        #data-overlay p span {
+            font-weight: bold;
+            color: #a0c3ff;
+        }
+
+
+
+        #bottom-ui {
+    position: absolute;
+    bottom: 110px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+       
+        #chyron {
+position: absolute;
+background-color: rgba(0, 0, 0, 0.7);
+padding: 8px 16px;
+border-radius: 8px;
+font-size: clamp(0.9rem, 2vw, 1.1rem);
+max-width: 400px;
+text-align: center;
+opacity: 0;
+transition: opacity 0.5s ease;
+pointer-events: none;
+transform: translateX(-50%);
+z-index: 65;
+color: white;
+border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+#chyron.visible {
+opacity: 1;
+}
+
+
+        #replay-button {
+            pointer-events: all;
+            display: none;
+        }
+       
+        #camera-controls {
+            display: none; /* Hidden as requested */
+            gap: 10px;
+            pointer-events: all;
+        }
+
+        .camera-button {
+            background-color: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+
+        .camera-button:hover {
+            background-color: rgba(0, 0, 0, 0.7);
+        }
+       
+        .camera-button.active {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+
+               #controls-container {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                background-color: rgba(0, 0, 0, 0.4);
+                padding: 8px 20px;
+                border-radius: 8px;
+}
+       
+        .control-button {
+            pointer-events: all;
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+       
+        .control-button svg {
+            width: 32px;
+            height: 32px;
+            filter: drop-shadow(0 2px 3px rgba(0,0,0,0.5));
+        }
+       
+        .control-button:hover {
+            transform: scale(1.1);
+        }
+
+
+        #progress-bar-container {
+            width: 70%;
+            max-width: 500px;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 3px;
+        }
+
+
+        #progress-bar {
+            width: 0%;
+            height: 100%;
+            background-color: #007bff;
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+
+        /* Styles for the main UI controls panel (collapsible) */
+        #ui-controls-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            pointer-events: all;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px; /* Space between event toggles and display options */
+            z-index: 70;
+            transition: max-height 0.3s ease-in-out, padding 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            max-height: 500px; /* Max height when expanded (adjust as needed) */
+            overflow: hidden; /* Hide overflow when collapsed */
+        }
+
+        #ui-controls-panel.collapsed {
+            max-height: 50px; /* Height when collapsed (just enough for toggle button) */
+            padding-top: 5px;
+            padding-bottom: 5px;
+            opacity: 0.0; /* Make it completely transparent */
+            pointer-events: none; /* Disable interaction when collapsed */
+        }
+
+        /* Styles for event type checkboxes */
+        #event-toggles-container {
+            display: flex;
+            flex-direction: column;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        #event-toggles-container label {
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 5px; /* Space below label */
+        }
+
+        .event-toggle-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+
+        .event-toggle-item input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #007bff;
+            border-radius: 3px;
+            background-color: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .event-toggle-item input[type="checkbox"]:checked {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+        .event-toggle-item input[type="checkbox"]:checked::after {
+            content: '✔';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        /* Styles for new display options toggles */
+        #display-options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2); /* Separator */
+            padding-top: 10px;
+        }
+
+        #display-options-container label {
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 5px;
+        }
+
+        .display-option-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.8rem;
+        }
+
+        .display-option-item input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #007bff;
+            border-radius: 3px;
+            background-color: rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+
+        .display-option-item input[type="checkbox"]:checked {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+
+        .display-option-item input[type="checkbox"]:checked::after {
+            content: '✔';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+            line-height: 1;
+        }
+
+        /* Collapse Toggle Button */
+        #panel-collapse-toggle {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            padding: 5px;
+            align-self: center; /* Center the button within the flex column */
+            margin-top: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        #panel-collapse-toggle svg {
+            width: 24px;
+            height: 24px;
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+        }
+
+        #ui-controls-panel.collapsed #panel-collapse-toggle svg {
+            transform: rotate(180deg); /* Rotate arrow when collapsed */
+        }
+    /* Timeline Styles */
+#timeline-container {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0, 0, 0, 0.4);
+    padding: 8px 15px;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    pointer-events: all;
+}
+        
+#timeline-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+#timeline-track {
+    position: relative;
+    height: 40px;
+}
+
+#timeline-progress {
+    position: absolute;
+    top: 18px;
+    left: 0;
+    height: 4px;
+    background-color: #007bff;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+    width: 0%;
+}
+
+#timeline-events {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    height: 100%;
+}
+
+.timeline-event {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2px solid #666;
+    background-color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 16px;
+    position: relative;
+}
+
+.timeline-event:hover {
+    transform: scale(1.1);
+}
+
+.timeline-event.current {
+    border-color: #007bff;
+    background-color: #007bff;
+    box-shadow: 0 0 15px rgba(0, 123, 255, 0.5);
+}
+
+.timeline-event.completed {
+    border-color: #28a745;
+    background-color: #28a745;
+}
+
+.timeline-event-label {
+    position: absolute;
+    bottom: -25px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: #999;
+    white-space: nowrap;
+}
+        
+    </style>
+</head>
+<body>
+    <div id="start-screen" class="overlay">
+        <h1>PixelXD Customer Animation Platform</h1>
+        <p>See your customers like never before</p>
+        <button id="start-button">START EXPERIENCE</button>
+    </div>
+
+
+    <div id="loading-overlay" class="overlay hidden">
+        <h1>Loading Assets</h1>
+        <p id="loading-text">Preparing the experience...</p>
+        <div id="loading-bar-container">
+            <div id="loading-bar"></div>
+        </div>
+    </div>
+
+
+    <div id="scene-container"></div>
+
+
+    <div id="ui-overlay" class="hidden">
+        <div id="top-ui">
+            <select id="journey-switcher"></select>
+            <div id="salesforce-integration" style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="contact-search" placeholder="Search Salesforce contacts..." 
+                       style="pointer-events: all; background-color: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.3); color: white; padding: 10px; border-radius: 8px; font-size: 1rem;">
+                <button id="search-button" onclick="searchContacts()" 
+                        style="pointer-events: all; background-color: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 8px; cursor: pointer;">
+                    Search
+                </button>
+            </div>
+
+            <div id="contact-results" style="pointer-events: all; background-color: rgba(0, 0, 0, 0.6); margin-top: 10px; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none;">
+                </div>
+            <h2 id="journey-title"></h2>
+        </div>
+        <div id="chyron"></div>
+        <div id="bottom-ui">
+                         <div id="camera-controls">
+                <button id="follow-cam-button" class="camera-button active">Follow Cam</button>
+                <button id="side-cam-button" class="camera-button">Side View</button>
+                <button id="top-cam-button" class="camera-button">Top-Down View</button>
+             </div>
+             <button id="replay-button" class="overlay-button">REPLAY JOURNEY</button>
+            <div id="controls-container">
+                <button id="prev-button" class="control-button">
+                    </button>
+                <button id="play-pause-button" class="control-button">
+                    </button>
+                <button id="next-button" class="control-button">
+                    </button>
+                <div id="progress-bar-container">
+                    <div id="progress-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="timeline-container">
+    <div id="timeline-header">
+        <span>Journey Timeline</span>
+        <span id="timeline-counter"></span>
+    </div>
+    <div id="timeline-track">
+        <div id="timeline-progress"></div>
+        <div id="timeline-events"></div>
+    </div>
+</div>
+    
+    <div id="data-overlay"></div>
+
+    <div id="ui-controls-panel">
+        <div id="event-toggles-container">
+            <label>Filter Events:</label>
+            </div>
+
+        <div id="display-options-container">
+            <label>Display Options:</label>
+            <label class="display-option-item">
+                <input type="checkbox" id="toggle-descriptions"> Descriptions
+            </label>
+            <label class="display-option-item">
+                <input type="checkbox" id="toggle-data"> Data Overlays
+            </label>
+            <label class="display-option-item">
+                <input type="checkbox" id="toggle-emotions"> Emotions
+            </label>
+        </div>
+        <button id="panel-collapse-toggle">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14l5-5 5 5z"/></svg>
+        </button>
+    </div>
+
+
+    <script>
+        // --- DOM Elements ---
+        const startScreen = document.getElementById('start-screen');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const sceneContainer = document.getElementById('scene-container');
+        const uiOverlay = document.getElementById('ui-overlay');
+        const startButton = document.getElementById('start-button');
+        const loadingBar = document.getElementById('loading-bar');
+        const loadingText = document.getElementById('loading-text');
+        const playPauseButton = document.getElementById('play-pause-button');
+        const progressBar = document.getElementById('progress-bar');
+        const replayButton = document.getElementById('replay-button');
+        const journeyTitleElement = document.getElementById('journey-title'); // Kept for reference, but will be hidden
+        const prevButton = document.getElementById('prev-button');
+        const nextButton = document.getElementById('next-button');
+        const chyron = document.getElementById('chyron');
+        const dataOverlay = document.getElementById('data-overlay');
+        const journeySwitcher = document.getElementById('journey-switcher');
+        const eventTogglesContainer = document.getElementById('event-toggles-container');
+        const uiControlsPanel = document.getElementById('ui-controls-panel'); // New reference
+        const panelCollapseToggle = document.getElementById('panel-collapse-toggle'); // New reference
+
+        // Display option checkboxes
+        const toggleDescriptions = document.getElementById('toggle-descriptions');
+        const toggleData = document.getElementById('toggle-data');
+        const toggleEmotions = document.getElementById('toggle-emotions');
+
+        // Camera buttons are now hidden, but references are kept for completeness if needed elsewhere
+        const cameraButtons = {
+            follow: document.getElementById('follow-cam-button'),
+            side: document.getElementById('side-cam-button'),
+            top: document.getElementById('top-cam-button'),
+        };
+
+
+        // --- App State Management ---
+        const AppState = {
+            IDLE: 'IDLE',
+            LOADING: 'LOADING',
+            PLAYING: 'PLAYING',
+            PAUSED: 'PAUSED',
+            FINISHED: 'FINISHED'
+        };
+        let currentAppState = AppState.IDLE;
+        let activeCameraMode = 'follow'; // Set to 'follow' permanently
+        let currentJourneyKey = 'newCustomerDelight';
+        // State for event toggles
+        let enabledEventTypes = {}; // Will be populated dynamically
+        // State for display toggles
+        let displayDescriptionsEnabled = true;
+        let displayDataEnabled = true;
+        let displayEmotionsEnabled = true;
+        // State for UI panel collapse
+        let uiPanelCollapsed = false;
+
+
+        // --- Three.js Core Components ---
+        let scene, camera, renderer, protagonist, clock, font, mixer, grid, ground, sky;
+        let activeEventObjects = [];
+       
+        // --- Journey Data ---
+        const journeyDataSets = {
+            newCustomerDelight: {
+              "journeyTitle": "New Customer Delight",
+              "theme": { "groundColor": "#f5f5f7", "gridColor": "#cccccc", "skyTopColor": "#a0c3ff", "skyBottomColor": "#f0f8ff", "purchaseCoinColor": "#ffd700" },
+              "events": [
+                { "type": "start", "position": [-10, 0, 0], "description": "The journey begins." },
+                { "type": "AD", "position": [-7, 0, 0], "eventDuration": 2.5, "sentiment": "curious", "description": "Customer sees an ad online", "data": { "Channel": "Social Media", "Cost": "$0.87", "Time Since Last Event": "14 Days" } },
+                { "type": "DOWNLOAD", "position": [-3, 0, 0], "eventDuration": 2.5, "sentiment": "content", "description": "Downloads a whitepaper", "data": { "Asset": "Getting Started Guide", "Time on Page": "2m 15s", "Time Since Last Event": "3 Days" } },
+                { "type": "EMAIL", "position": [3, 0, 0], "eventDuration": 2, "sentiment": "happy", "description": "Receives a welcome email", "data": { "Campaign": "Onboarding Flow", "Opened": "Yes", "Time Since Last Event": "1 Day" } },
+                { "type": "VISIT", "position": [7, 0, 0], "eventDuration": 2, "sentiment": "excited", "description": "Attends a product demo" },
+                { "type": "PURCHASE", "position": [13, 0, 0], "eventDuration": 3, "sentiment": "very_happy", "description": "Makes a purchase!", "camera": "zoom-in", "data": { "Value": "$2,500", "Product": "Pro Tier", "Time Since Last Event": "5 Days" } },
+                { "type": "IMPLEMENTATION", "position": [17, 0, 0], "eventDuration": 2.5, "sentiment": "determined", "description": "Onboards with the product" },
+                { "type": "SUPPORT", "position": [23, 0, 0], "eventDuration": 2, "sentiment": "concerned", "description": "Opens a support ticket", "data": { "Issue": "Implementation", "Severity": "High", "Time Since Last Event": "2 Days" } },
+                { "type": "RESOLVED", "position": [26, 0, 0], "eventDuration": 2, "sentiment": "relieved", "description": "Issue is successfully resolved", "camera": "hero-shot", "data": { "Resolution Time": "4 Hours", "Agent": "AI Bot", "Time Since Last Event": "4 Hours" } },
+                { "type": "end", "position": [29, 0, 0], "description": "The journey is complete!" }
+              ]
+            },
+            longEnterpriseSale: { // This key remains for internal reference
+                "journeyTitle": "Enterprise Sale", // Renamed title
+                "theme": { "groundColor": "#FFFFFF", "gridColor": "#B0C4DE", "skyTopColor": "#009DFF", "skyBottomColor": "#E0FFFF", "purchaseCoinColor": "#00A1E0" },
+                "events": [
+                    { "type": "start", "position": [-12, 0, 0], "description": "The journey begins." },
+                    { "type": "AD", "position": [-10, 0, 0], "eventDuration": 2, "sentiment": "curious", "description": "Sees a targeted ad", "data": { "Source": "LinkedIn", "Campaign": "Q3 Enterprise" } },
+                    { "type": "DOWNLOAD", "position": [-7, 0, 0], "eventDuration": 2.5, "sentiment": "content", "description": "Downloads a technical whitepaper", "data": { "Asset": "API Integration Guide", "Lead Score": "+15" } },
+                    { "type": "EMAIL", "position": [-4, 0, 0], "eventDuration": 2, "sentiment": "neutral", "description": "Receives a marketing email", "data": { "Campaign": "Nurture Series", "Opened": "No" } },
+                    { "type": "PHONE_CALL", "position": [-1, 0, 0], "eventDuration": 3, "sentiment": "neutral", "description": "Receives a phone call from sales", "data": { "Duration": "10 mins", "Outcome": "Discovery" } }, // New Event
+                    { "type": "DOWNLOAD", "position": [0, 0, 0], "eventDuration": 2.5, "sentiment": "content", "description": "Downloads a case study", "data": { "Asset": "Fortune 500 Success", "Lead Score": "+25" } },
+                    { "type": "EMAIL", "position": [3, 0, 0], "eventDuration": 2, "sentiment": "happy", "description": "Receives a personal sales email", "data": { "From": "John Smith (AE)", "Opened": "Yes", "Replied": "Yes" } },
+                    { "type": "MEETING", "position": [7, 0, 0], "eventDuration": 3, "sentiment": "excited", "description": "Attends first discovery call (Meeting)", "data": { "Duration": "30 mins", "Outcome": "Positive" } }, // New Event
+                    { "type": "VISIT", "position": [11, 0, 0], "eventDuration": 2, "sentiment": "excited", "description": "Technical demo with solution engineer", "data": { "Duration": "60 mins", "Attendees": "3" } },
+                    { "type": "PURCHASE", "position": [16, 0, 0], "eventDuration": 3, "sentiment": "very_happy", "description": "Makes a large purchase!", "camera": "zoom-in", "data": { "Value": "$150,000", "Product": "Enterprise Suite", "Time Since Last Event": "21 Days" } },
+                    { "type": "IMPLEMENTATION", "position": [20, 0, 0], "eventDuration": 4, "sentiment": "determined", "description": "Team works on onboarding and implementation", "data": { "Progress": "50%", "Time Since Last Event": "7 Days" } }, // Updated Event
+                    { "type": "SUPPORT", "position": [24, 0, 0], "eventDuration": 2.5, "sentiment": "concerned", "description": "Significant technical issue arises", "data": { "Issue": "API Rate Limits", "Severity": "Critical", "Time Since Last Event": "10 Days" } },
+                    { "type": "VISIT", "position": [28, 0, 0], "eventDuration": 2, "sentiment": "concerned", "description": "Dedicated support meeting", "data": { "Attendees": "4", "Outcome": "Action Plan Created" } },
+                    { "type": "RESOLVED", "position": [32, 0, 0], "eventDuration": 2, "sentiment": "relieved", "description": "Issue is successfully resolved", "camera": "hero-shot", "data": { "Resolution Time": "48 Hours", "Agent": "AI Bot", "Time Since Last Event": "4 Hours" } },
+                    { "type": "end", "position": [35, 0, 0], "description": "The journey is complete!" }
+                ]
+            }
+        };
+        let journeyEvents = [];
+
+
+        const journeyState = {
+            currentIndex: 0,
+            isEventAnimating: false,
+            isCameraAnimating: false,
+        };
+       
+        const movementSpeed = 3;
+        const emojis = { 'curious': '🤔', 'happy': '😊', 'content': '😌', 'excited': '🤩', 'very_happy': '🥳', 'determined': '💪', 'concerned': '😟', 'relieved': '✅', 'neutral': '😐' };
+        const sentimentWords = { 'curious': 'Curious', 'happy': 'Happy', 'content': 'Content', 'excited': 'Excited', 'very_happy': 'Very Happy', 'determined': 'Determined', 'concerned': 'Concerned', 'relieved': 'Relieved', 'neutral': 'Neutral' };
+
+
+        // --- UI Icons ---
+        const icons = {
+            play: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
+            pause: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`,
+            next: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>`,
+            prev: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M18 6l-8.5 6 8.5 6V6zM6 6h2v12H6V6z"/></svg>`
+        };
+
+
+        // --- Main App Logic ---
+
+
+        function init() {
+            scene = new THREE.Scene();
+            clock = new THREE.Clock();
+
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(-10, 7, 15);
+            camera.lookAt(-10, 0, 0);
+
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            sceneContainer.appendChild(renderer.domElement);
+           
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            directionalLight.position.set(15, 20, 10);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+
+            addSkybox();
+
+
+            const groundGeometry = new THREE.PlaneGeometry(100, 20);
+            ground = new THREE.Mesh(groundGeometry, new THREE.MeshLambertMaterial({ color: journeyDataSets[currentJourneyKey].theme.groundColor }));
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+
+            grid = new THREE.GridHelper(100, 100, journeyDataSets[currentJourneyKey].theme.gridColor, journeyDataSets[currentJourneyKey].theme.gridColor);
+            grid.material.opacity = 0.5;
+            grid.material.transparent = true;
+            scene.add(grid);
+           
+            protagonist.position.copy(journeyEvents[0].position);
+            scene.add(protagonist);
+            // Set protagonist initial rotation to face right (along positive X axis)
+            protagonist.rotation.y = Math.PI / 2;
+
+
+            window.addEventListener('resize', () => {
+    if (camera && renderer) {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Update overlay positions on resize
+    updateDataOverlayPosition();
+    updateChyronPosition();
+}, false);
+           
+            currentAppState = AppState.PLAYING;
+            updateUI();
+            animate();
+            populateEventToggles(); // Populate toggles after init
+            populateDisplayToggles(); // Populate new display toggles
+            resetJourney(); // Ensure journey starts from the beginning
+        }
+       
+        function addSkybox() {
+            const skyGeometry = new THREE.SphereGeometry(500, 32, 32);
+            const topColor = new THREE.Color(journeyDataSets[currentJourneyKey].theme.skyTopColor);
+            const bottomColor = new THREE.Color(journeyDataSets[currentJourneyKey].theme.skyBottomColor);
+            const vertexShader = `varying vec3 vWorldPosition; void main() { vec4 worldPosition = modelMatrix * vec4( position, 1.0 ); vWorldPosition = worldPosition.xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`;
+            const fragmentShader = `uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent; varying vec3 vWorldPosition; void main() { float h = normalize( vWorldPosition + offset ).y; gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h , 0.0), exponent ), 0.0 ) ), 1.0 ); }`;
+            const uniforms = { "topColor": { value: topColor }, "bottomColor": { value: bottomColor }, "offset": { value: 0 }, "exponent": { value: 0.8 } };
+            sky = new THREE.Mesh(skyGeometry, new THREE.ShaderMaterial({ uniforms: uniforms, vertexShader: vertexShader, fragmentShader: fragmentShader, side: THREE.BackSide }));
+            scene.add(sky);
+        }
+
+
+        function loadJourneyData(key) {
+            try {
+                currentJourneyKey = key;
+                const data = journeyDataSets[key];
+                // journeyTitleElement.textContent = data.journeyTitle; // Removed as element is hidden
+                journeyEvents = data.events.map(event => {
+                    event.position = new THREE.Vector3(event.position[0], event.position[1], event.position[2]);
+                    return event;
+                });
+                return true;
+            } catch (error) {
+                console.error("Could not process journey data:", error);
+                loadingText.textContent = "Error: Could not process journey data.";
+                return false;
+            }
+        }
+
+
+        function loadAssets(journeyKey) {
+            currentAppState = AppState.LOADING;
+            startScreen.classList.add('hidden');
+            loadingOverlay.classList.remove('hidden');
+           
+            loadingText.textContent = "Loading journey data...";
+            const journeyLoaded = loadJourneyData(journeyKey);
+
+
+            if (!journeyLoaded) return;
+
+
+            const manager = new THREE.LoadingManager();
+            manager.onProgress = (url, itemsLoaded, itemsTotal) => {
+                const progress = itemsLoaded / itemsTotal;
+                loadingBar.style.width = `${progress * 100}%`;
+                loadingText.textContent = `Loading ${url.split('/').pop()}...`;
+            };
+            manager.onLoad = () => {
+                loadingText.textContent = 'Assets Loaded!';
+                 if (!protagonist) createFallbackAvatar();
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                    uiOverlay.classList.remove('hidden');
+                    init();
+                }, 500);
+            };
+            manager.onError = (url) => {
+                console.error(`There was an error loading ${url}.`);
+                loadingText.textContent = `Error loading: ${url.split('/').pop()}.`;
+            };
+
+
+            const gltfLoader = new THREE.GLTFLoader(manager);
+            const fontLoader = new THREE.FontLoader(manager);
+           
+            const avatarUrl = 'https://threejs.org/examples/models/gltf/RobotExpressive/RobotExpressive.glb';
+            gltfLoader.load(avatarUrl, (gltf) => {
+                protagonist = gltf.scene;
+                protagonist.scale.set(0.5, 0.5, 0.5);
+                protagonist.position.y = 0;
+                protagonist.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+                mixer = new THREE.AnimationMixer(gltf.scene);
+                const walkClip = THREE.AnimationClip.findByName(gltf.animations, 'Walking');
+                if (walkClip) mixer.clipAction(walkClip).play();
+            });
+           
+            fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
+                font = loadedFont;
+            });
+        }
+       
+        function createFallbackAvatar() {
+            const geometry = new THREE.CylinderGeometry(0.5, 0.5, 1.8, 32);
+            const material = new THREE.MeshStandardMaterial({ color: 0xcccccc });
+            protagonist = new THREE.Mesh(geometry, material);
+            protagonist.castShadow = true;
+            protagonist.receiveShadow = true;
+            protagonist.position.y = 0.9;
+        }
+
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+           
+            if (mixer) mixer.update(delta);
+
+
+            if (currentAppState !== AppState.PLAYING || !protagonist) {
+                if(renderer && scene && camera) renderer.render(scene, camera);
+                return;
+            }
+           
+            let currentEventData = journeyEvents[journeyState.currentIndex];
+           
+            if (!journeyState.isEventAnimating) {
+                const targetPosition = currentEventData.position;
+                const distanceToTarget = protagonist.position.distanceTo(targetPosition);
+
+
+                if (distanceToTarget > 0.1) {
+                    const direction = targetPosition.clone().sub(protagonist.position).normalize();
+                    protagonist.position.add(direction.multiplyScalar(movementSpeed * delta));
+                    // Removed protagonist.lookAt() to maintain fixed orientation
+                    // protagonist.lookAt(targetPosition.x, protagonist.position.y, targetPosition.z);
+                } else {
+                    updateChyron();
+                    updateDataOverlay(); // Call updateDataOverlay here to show data for current event
+                    if (currentEventData.type !== 'start' && currentEventData.type !== 'end') {
+                        // Check if the current event type is enabled
+                        if (enabledEventTypes[currentEventData.type]) {
+                            journeyState.isEventAnimating = true;
+                            triggerEventAnimation(currentEventData);
+                        } else {
+                            // If disabled, skip to the next enabled event
+                            const nextIndex = findNextEnabledEventIndex(journeyState.currentIndex + 1);
+                            if (nextIndex !== null) {
+                                journeyState.currentIndex = nextIndex;
+                                // Immediately move protagonist to the next event's position
+                                protagonist.position.copy(journeyEvents[journeyState.currentIndex].position);
+                            } else {
+                                // No more enabled events, end the journey
+                                currentAppState = AppState.FINISHED;
+                                updateUI();
+                            }
+                        }
+                    } else {
+                        if (currentEventData.type === 'end') {
+                            currentAppState = AppState.FINISHED;
+                            updateUI();
+                        } else { // start event
+                            const nextIndex = findNextEnabledEventIndex(journeyState.currentIndex + 1);
+                            if (nextIndex !== null) {
+                                journeyState.currentIndex = nextIndex;
+                                protagonist.position.copy(journeyEvents[journeyState.currentIndex].position);
+                            } else {
+                                currentAppState = AppState.FINISHED;
+                                updateUI();
+                            }
+                        }
+                    }
+                }
+            }
+           
+            // Camera will always follow the protagonist now
+            updateCamera(delta);
+            updateDataOverlayPosition(); // Continuously update data overlay position
+            
+            updateChyronPosition(); // Continuously update chyron position
+
+            if (grid) grid.position.x = protagonist.position.x;
+           
+            renderer.render(scene, camera);
+        }
+
+        // Helper function to find the next enabled event
+        function findNextEnabledEventIndex(startIndex) {
+            for (let i = startIndex; i < journeyEvents.length; i++) {
+                const event = journeyEvents[i];
+                if (event.type === 'start' || event.type === 'end' || enabledEventTypes[event.type]) {
+                    return i;
+                }
+            }
+            return null; // No more enabled events found
+        }
+       
+        function onEventAnimationComplete() {
+            journeyState.isEventAnimating = false;
+            // Find the next enabled event after the current one
+            const nextIndex = findNextEnabledEventIndex(journeyState.currentIndex + 1);
+            if (nextIndex !== null) {
+                journeyState.currentIndex = nextIndex;
+            } else {
+                currentAppState = AppState.FINISHED;
+            }
+            updateUI();
+        }
+
+
+        function resetJourney() {
+            goToStep(0, true);
+        }
+       
+        function updateUI() {
+            playPauseButton.innerHTML = currentAppState === AppState.PLAYING ? icons.pause : icons.play;
+            const progress = journeyState.currentIndex / (journeyEvents.length - 1);
+            progressBar.style.width = `${progress * 100}%`;
+           
+            if (currentAppState === AppState.FINISHED) {
+                replayButton.style.display = 'block';
+                playPauseButton.style.display = 'none';
+            } else {
+                replayButton.style.display = 'none';
+                playPauseButton.style.display = 'block';
+            }
+            updateChyron();
+            // Data overlay visibility is now managed by updateDataOverlayPosition
+            // updateDataOverlay(); // Removed from here
+        updateTimeline();
+        }
+
+
+        function updateChyron() {
+    const currentEvent = journeyEvents[journeyState.currentIndex];
+
+    // Only show chyron if displayDescriptionsEnabled is true
+    if (displayDescriptionsEnabled && currentEvent && currentEvent.description) {
+        let text = currentEvent.description;
+
+        if (currentEvent.sentiment && sentimentWords[currentEvent.sentiment]) {
+            text += ` (Feeling: ${sentimentWords[currentEvent.sentiment]})`;
+        }
+
+        chyron.textContent = text;
+        chyron.classList.add('visible');
+        updateChyronPosition(); // Update position when showing
+    } else {
+        chyron.classList.remove('visible');
+    }
+}
+
+
+        function updateDataOverlay() {
+            const currentEvent = journeyEvents[journeyState.currentIndex];
+            dataOverlay.innerHTML = '';
+            // Only show data overlay if displayDataEnabled is true
+            if (displayDataEnabled && currentEvent && currentEvent.data) {
+                const items = [];
+                for (const key in currentEvent.data) {
+                    const p = document.createElement('p');
+                    const valueSpan = document.createElement('span');
+                    valueSpan.textContent = `${key}: `;
+                    const valueNode = document.createTextNode(currentEvent.data[key]);
+                    p.appendChild(valueSpan);
+                    p.appendChild(valueNode);
+                    dataOverlay.appendChild(p);
+                    items.push(p);
+
+
+                    if (key === 'Value') {
+                        const targetValue = parseFloat(currentEvent.data[key].replace(/[^0-9.-]+/g,""));
+                        let counter = { val: 0 };
+                        gsap.to(counter, {
+                            val: targetValue,
+                            duration: 1,
+                            onUpdate: () => {
+                                valueNode.textContent = '$' + Math.round(counter.val).toLocaleString();
+                            }
+                        });
+                    }
+                }
+                gsap.to(items, { opacity: 1, stagger: 0.2, duration: 0.5 });
+                dataOverlay.classList.add('visible');
+            } else {
+                dataOverlay.classList.remove('visible');
+            }
+        }
+
+        // New function to update data overlay position
+        function updateDataOverlayPosition() {
+            if (dataOverlay.classList.contains('visible') && protagonist && camera) {
+                const vector = new THREE.Vector3();
+                protagonist.getWorldPosition(vector); // Get protagonist's world position
+                vector.project(camera); // Project to screen coordinates
+
+                // Convert from NDC to pixel coordinates
+                const x = (vector.x + 1) / 2 * window.innerWidth;
+                // Position the top of the data overlay at 15% from the top of the screen
+                const y = (window.innerHeight * 15) / 100;
+
+                // Position the data overlay
+                dataOverlay.style.left = `${x}px`;
+                dataOverlay.style.top = `${y}px`;
+            } else {
+                // If not visible, ensure it's off-screen or hidden
+                dataOverlay.style.left = `-9999px`;
+                dataOverlay.style.top = `-9999px`;
+            }
+        }
+        
+function updateChyronPosition() {
+    if (chyron.classList.contains('visible') && protagonist && camera) {
+        const vector = new THREE.Vector3();
+        protagonist.getWorldPosition(vector);
+        vector.project(camera);
+
+        // Convert to screen coordinates
+        const x = (vector.x + 1) / 2 * window.innerWidth;
+        const y = (window.innerHeight * 25) / 100; // 25% from top
+
+        chyron.style.left = `${x}px`;
+        chyron.style.top = `${y}px`;
+    } else {
+        chyron.style.left = `-9999px`;
+        chyron.style.top = `-9999px`;
+    }
+}
+
+        function cleanupCurrentEvent() {
+            gsap.killTweensOf(camera.position);
+            journeyState.isCameraAnimating = false;
+            activeEventObjects.forEach(obj => {
+                scene.remove(obj);
+                if(obj.geometry) obj.geometry.dispose();
+                if(obj.material) obj.material.dispose();
+            });
+            activeEventObjects = [];
+            journeyState.isEventAnimating = false;
+            dataOverlay.classList.remove('visible'); // Hide data overlay on cleanup
+        }
+
+
+        function goToStep(index, playOnArrival = false) {
+            cleanupCurrentEvent();
+           
+            // Find the actual target index, skipping disabled events
+            let targetIndex = Math.max(0, Math.min(index, journeyEvents.length - 1));
+            if (journeyEvents[targetIndex].type !== 'start' && journeyEvents[targetIndex].type !== 'end' && !enabledEventTypes[journeyEvents[targetIndex].type]) {
+                // If the target index is a disabled event, find the next enabled one
+                const nextEnabled = findNextEnabledEventIndex(targetIndex);
+                if (nextEnabled !== null) {
+                    targetIndex = nextEnabled;
+                } else {
+                    // If no enabled events found after, try finding previous enabled ones
+                    let prevEnabled = null;
+                    for (let i = targetIndex - 1; i >= 0; i--) {
+                        if (journeyEvents[i].type === 'start' || enabledEventTypes[journeyEvents[i].type]) {
+                            prevEnabled = i;
+                            break;
+                        }
+                    }
+                    targetIndex = prevEnabled !== null ? prevEnabled : 0; // Go to start if nothing else
+                }
+            }
+
+            journeyState.currentIndex = targetIndex;
+            const targetPosition = journeyEvents[journeyState.currentIndex].position;
+           
+            protagonist.position.copy(targetPosition);
+           
+            if (playOnArrival) {
+                currentAppState = AppState.PLAYING;
+            } else {
+                currentAppState = AppState.PAUSED;
+            }
+            updateUI();
+        }
+       
+        function switchJourney(journeyKey) {
+            cleanupCurrentEvent();
+            loadJourneyData(journeyKey);
+           
+            const theme = journeyDataSets[currentJourneyKey].theme;
+            ground.material.color.set(theme.groundColor);
+            grid.material.color = new THREE.Color(theme.gridColor);
+            sky.material.uniforms.topColor.value.set(theme.skyTopColor);
+            sky.material.uniforms.bottomColor.value.set(theme.skyBottomColor);
+           
+            resetJourney();
+        }
+
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', () => loadAssets('newCustomerDelight'));
+       
+        playPauseButton.addEventListener('click', () => {
+            if (currentAppState === AppState.PLAYING) {
+                currentAppState = AppState.PAUSED;
+            } else if (currentAppState === AppState.PAUSED || currentAppState === AppState.FINISHED) {
+                if (currentAppState === AppState.FINISHED) {
+                    resetJourney();
+                }
+                currentAppState = AppState.PLAYING;
+            }
+            updateUI();
+        });
+
+
+        prevButton.addEventListener('click', () => goToStep(journeyState.currentIndex - 1));
+        nextButton.addEventListener('click', () => goToStep(journeyState.currentIndex + 1));
+        replayButton.addEventListener('click', resetJourney);
+
+
+        // Removed camera button event listeners as they are no longer needed
+        /*
+        Object.keys(cameraButtons).forEach(key => {
+            cameraButtons[key].addEventListener('click', () => {
+                setActiveCamera(key);
+            });
+        });
+        */
+
+
+        journeySwitcher.addEventListener('change', (event) => {
+            switchJourney(event.target.value);
+        });
+       
+        // Populate journey switcher
+        for (const key in journeyDataSets) {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = journeyDataSets[key].journeyTitle;
+            journeySwitcher.appendChild(option);
+        }
+       
+        prevButton.innerHTML = icons.prev;
+        nextButton.innerHTML = icons.next;
+
+
+        // --- Camera Logic ---
+        function setActiveCamera(mode) {
+            // This function is no longer needed for direct user interaction,
+            // but keeping it in case internal logic might still call it.
+            // It will effectively always set to 'follow' if called.
+            activeCameraMode = 'follow';
+            // No need to update button active states since buttons are hidden
+            /*
+            Object.keys(cameraButtons).forEach(key => {
+                cameraButtons[key].classList.toggle('active', key === mode);
+            });
+            */
+        }
+
+
+        function updateCamera(delta) {
+            let targetPosition;
+            const protagonistPos = protagonist.position;
+
+
+            // Camera mode is now always 'follow'
+            targetPosition = new THREE.Vector3(protagonistPos.x, 7, protagonistPos.z + 15);
+           
+            camera.position.lerp(targetPosition, delta * 2.0);
+            camera.lookAt(protagonistPos.x, 0, protagonistPos.z);
+        }
+
+
+        function triggerCameraAnimation(cameraType, targetPosition) {
+            journeyState.isCameraAnimating = true;
+            let onComplete = () => { journeyState.isCameraAnimating = false; };
+
+            // Only 'zoom-in' and 'hero-shot' are handled here,
+            // but the main camera will always revert to 'follow' after these animations.
+            if (cameraType === 'zoom-in') {
+                gsap.to(camera.position, {
+                    x: targetPosition.x, y: 3, z: targetPosition.z + 5, duration: 1.5, ease: 'power2.inOut', onComplete
+                });
+            } else if (cameraType === 'hero-shot') {
+                gsap.to(camera.position, {
+                    x: targetPosition.x, y: 10, z: targetPosition.z + 20, duration: 2.0, ease: 'power2.out', onComplete
+                });
+            } else {
+                journeyState.isCameraAnimating = false;
+            }
+        }
+
+
+        // --- Event Animations ---
+        function triggerEventAnimation(eventData) {
+            if (eventData.camera) {
+                triggerCameraAnimation(eventData.camera, eventData.position);
+            }
+            // Only show sentiment bubble if displayEmotionsEnabled is true
+            if (displayEmotionsEnabled) {
+                showSentimentBubble(eventData.sentiment, eventData.position);
+            }
+
+
+            switch (eventData.type) {
+                case 'AD': createAdAnimation(eventData); break;
+                case 'EMAIL': createEmailAnimation(eventData); break;
+                case 'DOWNLOAD': createDownloadAnimation(eventData); break;
+                case 'VISIT': createVisitAnimation(eventData); break;
+                case 'PURCHASE': createPurchaseAnimation(eventData); break;
+                case 'IMPLEMENTATION': createImplementationAnimation(eventData); break;
+                case 'SUPPORT': createSupportAnimation(eventData); break;
+                case 'RESOLVED': createResolvedAnimation(eventData); break;
+                case 'PHONE_CALL': createPhoneCallAnimation(eventData); break; // New
+                case 'MEETING': createMeetingAnimation(eventData); break;     // New
+                default:
+                    onEventAnimationComplete();
+                    break;
+            }
+        }
+
+
+        function createTextSprite(text, options) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            const fontSize = options.fontSize || 64;
+            canvas.width = options.width || 512;
+            canvas.height = options.height || 128;
+
+
+            context.font = `Bold ${fontSize}px Arial`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+
+
+            if (options.outline) {
+                context.strokeStyle = options.outlineColor || 'black';
+                context.lineWidth = options.outlineWidth || 8;
+                context.strokeText(text, canvas.width / 2, canvas.height / 2);
+            }
+           
+            context.fillStyle = options.color || 'rgba(255,255,255,1)';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0 });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(options.scaleX || 4, options.scaleY || 1, 1);
+            activeEventObjects.push(sprite);
+            return sprite;
+        }
+       
+        function showSentimentBubble(sentiment, position) {
+            const emoji = emojis[sentiment];
+            if (!emoji) return;
+
+
+            const bubble = createTextSprite(emoji, { fontSize: 80, width: 128, height: 128, scaleX: 2.5, scaleY: 2.5 });
+            bubble.position.copy(position);
+            bubble.position.y += 3.5;
+            scene.add(bubble);
+
+
+            gsap.timeline({ onComplete: () => scene.remove(bubble) })
+            .to(bubble.material, { opacity: 1, duration: 0.3 })
+            .to(bubble.position, { y: '+=0.3', duration: 0.5, yoyo: true, repeat: 1, ease: "sine.inOut" }, 0.3)
+            .to(bubble.material, { opacity: 0, duration: 0.5, delay: 1.0 });
+        }
+       
+        function createAdAnimation({ position, eventDuration }) {
+            const group = new THREE.Group();
+            group.position.copy(position).add(new THREE.Vector3(1.5, 1, 0));
+            scene.add(group);
+            activeEventObjects.push(group);
+
+
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 0.1), new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
+            group.add(frame);
+
+
+            const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), new THREE.MeshBasicMaterial({ color: 0x333333 }));
+            screen.position.z = 0.06;
+            group.add(screen);
+
+
+            const ad = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.8), new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0 }));
+            ad.position.z = 0.07;
+            group.add(ad);
+           
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+            .from(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'back.out(1.7)' })
+            .to(ad.material, { opacity: 1, duration: 0.3 }, ">0.2")
+            .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'power2.in', delay: eventDuration - 1.5 });
+        }
+       
+        function createEmailAnimation({ position, eventDuration }) {
+            const group = new THREE.Group();
+            scene.add(group);
+            activeEventObjects.push(group);
+
+
+            const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1, 0.05), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+            group.add(back);
+           
+            const flapShape = new THREE.Shape();
+            flapShape.moveTo(-0.75, 0.5);
+            flapShape.lineTo(0.75, 0.5);
+            flapShape.lineTo(0.0,  0.0);
+            flapShape.closePath();
+
+
+            const flap = new THREE.Mesh(new THREE.ShapeGeometry(flapShape), new THREE.MeshBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0, side: THREE.DoubleSide }));
+            group.add(flap);
+           
+            const outlinePoints = [
+                new THREE.Vector3(-0.75, -0.5, 0), new THREE.Vector3(0.75, -0.5, 0),
+                new THREE.Vector3(0.75, 0.5, 0), new THREE.Vector3(-0.75, 0.5, 0),
+                new THREE.Vector3(-0.75, -0.5, 0),
+                new THREE.Vector3(0.0, 0.0, 0), new THREE.Vector3(0.75, 0.5, 0)
+            ];
+            const outline = new THREE.Line(new THREE.BufferGeometry().setFromPoints(outlinePoints), new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0 }));
+            group.add(outline);
+
+
+            group.position.copy(position).add(new THREE.Vector3(1.5, 1.5, 0));
+
+
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+            .to([back.material, flap.material, outline.material], { opacity: 1, duration: 0.2 }, 0)
+            .fromTo(group.position,
+                { y: group.position.y + 2, z: group.position.z - 2, x: group.position.x - 2 },
+                { y: group.position.y, z: group.position.z, x: group.position.x, duration: 0.8, ease: "back.out(1.7)" }, 0)
+            .to(group.rotation, { y: Math.PI * 2, duration: 1.0, ease: "power1.inOut" }, "<0.2")
+            .to(group.position, { y: "+=0.2", duration: 0.8, yoyo: true, repeat: 1, ease: "sine.inOut" }, ">")
+            .to([back.material, flap.material, outline.material], { opacity: 0, duration: 0.5 }, ">0.5");
+        }
+       
+        function createDownloadAnimation({ position, eventDuration }) {
+            const group = new THREE.Group();
+            group.position.copy(position).add(new THREE.Vector3(2.5, 2, 0));
+            scene.add(group);
+            activeEventObjects.push(group);
+
+
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 0.1), new THREE.MeshStandardMaterial({ color: 0xeeeeee }));
+            group.add(frame);
+
+
+            const screen = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 1.3), new THREE.MeshBasicMaterial({ color: 0x333333 }));
+            screen.position.z = 0.06;
+            group.add(screen);
+
+
+            const doc = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.7), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 }));
+            doc.position.z = 0.07;
+            group.add(doc);
+
+
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+            .from(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'back.out(1.7)' })
+            .to(doc.material, { opacity: 1 }, ">0.2")
+            .to(doc.position, { x: 3, y: -0.5, duration: 0.8, ease: "power2.out" }, ">0.1")
+            .to(doc.rotation, { z: Math.PI, duration: 0.8 }, "<")
+            .to([doc.material, frame.material, screen.material], { opacity: 0, duration: 0.5 }, ">-0.2")
+            .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'power2.in' }, "<");
+        }
+
+
+        function createVisitAnimation({ position, eventDuration }) {
+            const group = new THREE.Group();
+            group.position.copy(position).add(new THREE.Vector3(1.5, 1, 0));
+            scene.add(group);
+            activeEventObjects.push(group);
+
+
+            const headGeo = new THREE.SphereGeometry(0.2, 16, 16);
+            const bodyGeo = new THREE.CylinderGeometry(0.05, 0.2, 0.5, 8);
+            const personMat = new THREE.MeshStandardMaterial({ color: 0x5588ff });
+
+
+            const person1 = new THREE.Group();
+            const head1 = new THREE.Mesh(headGeo, personMat);
+            head1.position.y = 0.45;
+            const body1 = new THREE.Mesh(bodyGeo, personMat);
+            person1.add(head1, body1);
+            person1.position.x = -0.6;
+            group.add(person1);
+           
+            const person2 = person1.clone();
+            person2.position.x = 0.6;
+            group.add(person2);
+
+
+            const table = new THREE.Mesh(new THREE.BoxGeometry(1, 0.1, 0.8), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
+            table.position.y = -0.2;
+            group.add(table);
+
+
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+                .from(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'back.out(1.7)' })
+                .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'power2.in', delay: eventDuration - 1.0 });
+        }
+       
+        function createPurchaseAnimation({ position, sentiment, eventDuration, description }) {
+            const group = new THREE.Group();
+            scene.add(group);
+            activeEventObjects.push(group);
+
+
+            const coinMaterial = new THREE.MeshStandardMaterial({ color: journeyDataSets[currentJourneyKey].theme.purchaseCoinColor, metalness: 0.5, roughness: 0.3 });
+            const coinGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.1, 24);
+            const numCoins = 8;
+            let completedCoins = 0;
+
+
+            for (let i = 0; i < numCoins; i++) {
+                const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+                const angle = (i / numCoins) * Math.PI * 2;
+                const radius = 1.5 + Math.random() * 0.5;
+                coin.position.set(position.x + Math.cos(angle) * radius, position.y - 1, position.z + Math.sin(angle) * radius);
+                group.add(coin);
+               
+                gsap.to(coin.position, {
+                    y: position.y + 1 + Math.random() * 2, duration: 0.5 + Math.random() * 0.5, ease: "power2.out", yoyo: true, repeat: 1, delay: i * 0.1,
+                    onComplete: () => {
+                        completedCoins++;
+                        if (completedCoins === numCoins) {
+                           gsap.to(group.children.map(c => c.scale), { x: 0, y: 0, z: 0, duration: 0.4, stagger: 0.05, onComplete: onEventAnimationComplete });
+                        }
+                    }
+                });
+            }
+        }
+       
+        function createImplementationAnimation({ position, eventDuration }) {
+            const group = new THREE.Group();
+            group.position.copy(position).add(new THREE.Vector3(2.5, 2.5, 0)); // Centered above
+            scene.add(group);
+            activeEventObjects.push(group);
+
+            // Workbench
+            const workbenchGeo = new THREE.BoxGeometry(2.5, 0.5, 1.0);
+            const workbenchMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 }); // Brown
+            const workbench = new THREE.Mesh(workbenchGeo, workbenchMat);
+            workbench.position.y = -0.75; // Adjust to sit on the ground
+            group.add(workbench);
+
+            // Simplified people (cylinders)
+            const personGeo = new THREE.CylinderGeometry(0.2, 0.2, 1.0, 16);
+            const personMat = new THREE.MeshStandardMaterial({ color: 0x5588ff });
+
+            const person1 = new THREE.Mesh(personGeo, personMat);
+            person1.position.set(-0.8, 0, 0.3);
+            group.add(person1);
+
+            const person2 = new THREE.Mesh(personGeo, personMat);
+            person2.position.set(0.8, 0, 0.3);
+            group.add(person2);
+
+            // Tools/Contraption (simple boxes/spheres)
+            const tool1 = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshStandardMaterial({ color: 0xcccccc }));
+            tool1.position.set(-0.3, 0.2, 0);
+            group.add(tool1);
+
+            const tool2 = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), new THREE.MeshStandardMaterial({ color: 0xaaaaaa }));
+            tool2.position.set(0.3, 0.2, 0);
+            group.add(tool2);
+           
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+            .from(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'back.out(1.7)' })
+            .to(group.rotation, { y: Math.PI * 2, duration: eventDuration * 0.8, ease: "linear" }, "<0.2") // Rotate for duration
+            .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'power2.in', delay: eventDuration - 1.0 });
+        }
+       
+        function createSupportAnimation({ position, eventDuration }) {
+            const questionMark = createTextSprite('?', {
+                fontSize: 128,
+                width: 256,
+                height: 256,
+                scaleX: 3,
+                scaleY: 3,
+                outline: true,
+                outlineColor: '#333333',
+                outlineWidth: 12
+            });
+            questionMark.position.copy(position).add(new THREE.Vector3(2.5, 2.5, 0));
+            scene.add(questionMark);
+           
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+                .from(questionMark.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'back.out(2.5)' })
+                .to(questionMark.material, { opacity: 1 }, "<")
+                .to(questionMark.rotation, { y: Math.PI * 2, duration: 1.5, ease: 'power2.inOut' }, ">0.2")
+                .to(questionMark.scale, { x: 0, y: 0, z: 0, duration: 0.5, ease: 'power2.in', delay: eventDuration - 2.2 });
+        }
+       
+        function createResolvedAnimation({ position, eventDuration }) {
+            const shape = new THREE.Shape();
+            shape.moveTo(-0.8, -0.2); shape.lineTo(-0.3, -0.7); shape.lineTo(0.8, 0.4); shape.lineTo(0.6, 0.6); shape.lineTo(-0.3, -0.3); shape.lineTo(-0.8, -0.2);
+            const checkmark = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0 }));
+            checkmark.position.copy(position).add(new THREE.Vector3(2.5, 2.5, 0));
+            scene.add(checkmark);
+            activeEventObjects.push(checkmark);
+
+
+            gsap.timeline({ onComplete: onEventAnimationComplete })
+            .fromTo(checkmark.scale, {x:0, y:0, z:0}, {x:1.5, y:1.5, z:1.5, duration: 0.3, ease: 'back.out(3)'})
+            .to(checkmark.material, {opacity: 1}, 0)
+            .to(checkmark.material, {opacity: 0, duration: 0.5, delay: eventDuration - 0.8});
+        }
+
+        // --- New Event Animations ---
+        function createPhoneCallAnimation({ position, eventDuration }) {
+    const group = new THREE.Group();
+    group.position.copy(position).add(new THREE.Vector3(2, 0, 0)); // Move 2 units to the right
+    scene.add(group);
+    activeEventObjects.push(group);
+
+    const phoneSprite = createTextSprite('📞', { 
+        fontSize: 80, 
+        width: 128, 
+        height: 128, 
+        scaleX: 2.5, 
+        scaleY: 2.5 
+    });
+    
+    phoneSprite.position.set(0, 2.5, 0); // Start high up, to the side
+    group.add(phoneSprite);
+
+    gsap.timeline({ onComplete: onEventAnimationComplete })
+        .to(phoneSprite.material, { opacity: 1, duration: 0.2 })
+        .to(phoneSprite.position, { 
+            x: -0.5,  // Move slightly toward protagonist
+            y: 2.0,   // Stay elevated
+            z: 0.5, 
+            duration: 0.7,
+            ease: 'power2.out'
+        }, 0)
+        .to(phoneSprite.rotation, { 
+            z: Math.PI / 8, 
+            duration: 0.1, 
+            yoyo: true, 
+            repeat: 8,  // More shakes for visibility
+            ease: 'sine.inOut' 
+        }, 0.2)
+        .to(phoneSprite.material, { opacity: 0, duration: 0.5 }, eventDuration - 1.0)
+        .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.1 }, ">");
+}
+
+        function createMeetingAnimation({ position, eventDuration }) {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    scene.add(group);
+    activeEventObjects.push(group);
+
+    const meetingSprite = createTextSprite('👥', { 
+        fontSize: 80, 
+        width: 128, 
+        height: 128, 
+        scaleX: 2.5, 
+        scaleY: 2.5 
+    });
+
+    // Start from the left side, higher up
+    meetingSprite.position.set(-8, 3, -2);
+    group.add(meetingSprite);
+
+    gsap.timeline({ onComplete: onEventAnimationComplete })
+        .to(meetingSprite.material, { opacity: 1, duration: 0.5 })
+        .to(meetingSprite.position, { 
+            x: -2,    // Stop to the left of protagonist
+            y: 2.5,   // Stay elevated  
+            z: 0.5,   // Slightly forward
+            duration: 1.5,
+            ease: 'power2.out'
+        }, 0)
+        .to(meetingSprite.scale, { 
+            x: 1.2, y: 1.2, z: 1.2, 
+            duration: 0.3, 
+            yoyo: true, 
+            repeat: 1,
+            ease: 'sine.inOut' 
+        }, 0.8) // Pulse effect when it arrives
+        .to(meetingSprite.material, { opacity: 0, duration: 0.5 }, eventDuration - 1.0)
+        .to(group.scale, { x: 0, y: 0, z: 0, duration: 0.1 }, ">");
+}
+
+
+        // --- Event Toggles Logic ---
+        function populateEventToggles() {
+            // Get all unique event types from journeyDataSets
+            const allEventTypes = new Set();
+            for (const journeyKey in journeyDataSets) {
+                journeyDataSets[journeyKey].events.forEach(event => {
+                    if (event.type !== 'start' && event.type !== 'end') {
+                        allEventTypes.add(event.type);
+                    }
+                });
+            }
+
+            eventTogglesContainer.innerHTML = '<label>Filter Events:</label>'; // Clear existing content and add label
+            allEventTypes.forEach(type => {
+                const label = document.createElement('label');
+                label.className = 'event-toggle-item';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `toggle-${type}`;
+                checkbox.checked = true; // Default to enabled
+                enabledEventTypes[type] = true; // Initialize state
+
+                checkbox.addEventListener('change', (event) => {
+                    enabledEventTypes[type] = event.target.checked;
+                    // If an event type is disabled while the journey is playing,
+                    // we need to potentially skip to the next enabled event.
+                    if (currentAppState === AppState.PLAYING || currentAppState === AppState.PAUSED) {
+                        const nextIndex = findNextEnabledEventIndex(journeyState.currentIndex);
+                        if (nextIndex !== journeyState.currentIndex && nextIndex !== null) {
+                            goToStep(nextIndex); // Move to the next valid event
+                        } else if (nextIndex === null && journeyState.currentIndex < journeyEvents.length - 1) {
+                            // If no more enabled events, but not at end yet, force to end
+                            currentAppState = AppState.FINISHED;
+                            updateUI();
+                        }
+                    }
+                });
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(type.replace(/_/g, ' '))); // Make it more readable
+                eventTogglesContainer.appendChild(label);
+            });
+        }
+
+        // --- Display Options Toggles Logic ---
+        function populateDisplayToggles() {
+            // Set initial states for display options
+            toggleDescriptions.checked = displayDescriptionsEnabled;
+            toggleData.checked = displayDataEnabled;
+            toggleEmotions.checked = displayEmotionsEnabled;
+
+            toggleDescriptions.addEventListener('change', (event) => {
+                displayDescriptionsEnabled = event.target.checked;
+                updateChyron(); // Update chyron visibility immediately
+            });
+
+            toggleData.addEventListener('change', (event) => {
+                displayDataEnabled = event.target.checked;
+                updateDataOverlay(); // Update data overlay visibility immediately
+                updateDataOverlayPosition(); // Recalculate position if visibility changes
+            });
+
+            toggleEmotions.addEventListener('change', (event) => {
+                displayEmotionsEnabled = event.target.checked;
+                // Emotions are handled within showSentimentBubble, no direct update needed here
+            });
+        }
+
+        // --- Panel Collapse Toggle Logic ---
+        panelCollapseToggle.addEventListener('click', () => {
+            uiPanelCollapsed = !uiPanelCollapsed;
+            uiControlsPanel.classList.toggle('collapsed', uiPanelCollapsed);
+        });
+
+        // Timeline Functions
+function updateTimeline() {
+    const timelineContainer = document.getElementById('timeline-events');
+    const timelineProgress = document.getElementById('timeline-progress');
+    const timelineCounter = document.getElementById('timeline-counter');
+    
+    if (!timelineContainer) return;
+    
+    // Update counter
+    timelineCounter.textContent = `${journeyState.currentIndex + 1} / ${journeyEvents.length}`;
+    
+    // Update progress bar
+    const progress = ((journeyState.currentIndex + 1) / journeyEvents.length) * 100;
+    timelineProgress.style.width = `${progress}%`;
+    
+    // Clear and rebuild timeline events
+    timelineContainer.innerHTML = '';
+    
+    journeyEvents.forEach((event, index) => {
+        if (event.type === 'start' || event.type === 'end') return;
+        if (!enabledEventTypes[event.type]) return;
+        
+        const eventButton = document.createElement('button');
+        eventButton.className = 'timeline-event';
+        eventButton.innerHTML = getEventIcon(event.type);
+        eventButton.title = event.description;
+        
+        // Add state classes
+        if (index < journeyState.currentIndex) {
+            eventButton.classList.add('completed');
+        } else if (index === journeyState.currentIndex) {
+            eventButton.classList.add('current');
+        }
+        
+        // Add click handler
+        eventButton.addEventListener('click', () => goToStep(index));
+        
+        // Add label
+        const label = document.createElement('div');
+        label.className = 'timeline-event-label';
+        label.textContent = event.type.replace('_', ' ');
+        eventButton.appendChild(label);
+        
+        timelineContainer.appendChild(eventButton);
+    });
+}
+
+function getEventIcon(eventType) {
+    const icons = {
+        'AD': '📢',
+        'EMAIL': '✉️',
+        'DOWNLOAD': '📁',
+        'VISIT': '👥',
+        'PURCHASE': '💰',
+        'IMPLEMENTATION': '⚙️',
+        'SUPPORT': '❓',
+        'RESOLVED': '✅',
+        'PHONE_CALL': '📞',
+        'MEETING': '🤝'
+    };
+    return icons[eventType] || '●';
+}
+        
+// Add these functions to your existing JavaScript section
+let availableContacts = [];
+// Function to search for Salesforce contacts
+async function searchContacts() {
+    const searchInput = document.getElementById('contact-search');
+    const searchButton = document.getElementById('search-button');
+    const contactResults = document.getElementById('contact-results');
+    
+    const contactName = searchInput.value.trim();
+    if (!contactName) {
+        alert('Please enter a contact name to search');
+        return;
+    }
+    
+    // Update UI to show loading
+    searchButton.textContent = 'Searching...';
+    searchButton.disabled = true;
+    contactResults.style.display = 'none';
+    
+    try {
+        console.log(`Searching for contact: ${contactName}`);
+        const response = await fetch('/.netlify/functions/get-contact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ contactName })
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+        
+        console.log(`Found ${data.totalSize} contacts`);
+        // Display search results
+        displayContactResults(data.contacts);
+    } catch (error) {
+        console.error('Contact search error:', error);
+        alert(`Search failed: ${error.message}`);
+    } finally {
+        // Reset UI
+        searchButton.textContent = 'Search';
+        searchButton.disabled = false;
+    }
+}
+
+// Function to display contact search results
+function displayContactResults(contacts) {
+    const contactResults = document.getElementById('contact-results');
+    if (!contacts || contacts.length === 0) {
+        contactResults.innerHTML = '<div style="padding: 10px; color: #ccc;">No contacts found</div>';
+        contactResults.style.display = 'block';
+        return;
+    }
+    
+    let resultsHTML = '';
+    contacts.forEach(contact => {
+        resultsHTML += `
+            <div onclick="loadContactJourney('${contact.Id}', '${contact.Name}')" 
+                 style="padding: 10px; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.1); color: white;"
+                 onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'"
+                 onmouseout="this.style.backgroundColor='transparent'">
+             
+                <strong>${contact.Name}</strong>
+                ${contact.Email ? `<br><small style="color: #aaa;">${contact.Email}</small>` : ''}
+                ${contact.Account ? `<br><small style="color: #aaa;">Account: ${contact.Account.Name}</small>` : ''}
+            </div>
+        `;
+    });
+    contactResults.innerHTML = resultsHTML;
+    contactResults.style.display = 'block';
+}
+
+// Function to load a contact's journey
+async function loadContactJourney(contactId, contactName) {
+    const contactResults = document.getElementById('contact-results');
+    // Hide search results
+    contactResults.style.display = 'none';
+    // Show loading state
+    if (loadingOverlay) {
+        loadingOverlay.classList.remove('hidden');
+        loadingText.textContent = `Loading journey for ${contactName}...`;
+    }
+    
+    try {
+        console.log(`Loading journey for contact: ${contactId}`);
+        const response = await fetch('/.netlify/functions/contact-journey', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ contactId })
+        });
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error);
+        }
+        
+        console.log('Journey loaded successfully:', data.journey);
+        // Update the journey data
+        journeyDataSets.salesforceJourney = data.journey;
+        // Switch to the new journey
+        currentJourneyKey = 'salesforceJourney';
+        // Reload the scene with new data
+        if (scene && protagonist) {
+            cleanupCurrentEvent();
+            loadJourneyData('salesforceJourney');
+            
+            // Update theme
+            const theme = journeyDataSets[currentJourneyKey].theme;
+            if (ground) ground.material.color.set(theme.groundColor);
+            if (grid) grid.material.color = new THREE.Color(theme.gridColor);
+            if (sky) {
+                sky.material.uniforms.topColor.value.set(theme.skyTopColor);
+                sky.material.uniforms.bottomColor.value.set(theme.skyBottomColor);
+            }
+            
+            // Reset journey
+            resetJourney();
+        }
+        
+        // Update journey switcher
+        const journeySwitcher = document.getElementById('journey-switcher');
+        let salesforceOption = journeySwitcher.querySelector('option[value="salesforceJourney"]');
+        if (!salesforceOption) {
+            salesforceOption = document.createElement('option');
+            salesforceOption.value = 'salesforceJourney';
+            journeySwitcher.appendChild(salesforceOption);
+        }
+        salesforceOption.textContent = data.journey.journeyTitle;
+        journeySwitcher.value = 'salesforceJourney';
+    } catch (error) {
+        console.error('Journey loading error:', error);
+        alert(`Failed to load journey: ${error.message}`);
+    } finally {
+        // Hide loading screen
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('hidden');
+        }
+    }
+}
+
+// Add event listener for Enter key in search input
+document.addEventListener('DOMContentLoaded', function() {
+    const contactSearch = document.getElementById('contact-search');
+    if (contactSearch) {
+        contactSearch.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchContacts();
+            }
+        });
+    }
+});
+    </script>
+</body>
+</html>

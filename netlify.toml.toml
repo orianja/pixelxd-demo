@@ -1,0 +1,10 @@
+[build]
+  functions = netlifyfunctions
+
+[[redirects]]
+  from = 
+  to = index.html
+  status = 200
+
+[functions]
+  node_bundler = esbuild

@@ -1,0 +1,76 @@
+export default async (request, context) => {
+  // Set CORS headers for browser requests
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Content-Type': 'application/json'
+  };
+
+  // Handle preflight OPTIONS request
+  if (request.method === 'OPTIONS') {
+    return new Response('', { status: 200, headers });
+  }
+
+  try {
+    const { SF_CLIENT_ID, SF_CLIENT_SECRET, SF_USERNAME, SF_PASSWORD } = process.env;
+
+    // Check if all required environment variables are present
+    if (!SF_CLIENT_ID || !SF_CLIENT_SECRET || !SF_USERNAME || !SF_PASSWORD) {
+      throw new Error('Missing required Salesforce environment variables');
+    }
+
+    // Use your dev instance URL
+    const authUrl = 'https://pixelxd2-dev-ed.develop.my.salesforce.com/services/oauth2/token';
+    const authBody = new URLSearchParams({
+      grant_type: 'password',
+      client_id: SF_CLIENT_ID,
+      client_secret: SF_CLIENT_SECRET,
+      username: SF_USERNAME,
+      password: SF_PASSWORD
+    });
+
+    console.log('Attempting Salesforce authentication...');
+
+    // Make authentication request to Salesforce
+    const authResponse = await fetch(authUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: authBody
+    });
+
+    const authData = await authResponse.json();
+
+    if (!authResponse.ok) {
+      console.error('Salesforce auth error:', authData);
+      throw new Error(`Salesforce authentication failed: ${authData.error_description || authData.error}`);
+    }
+
+    console.log('Salesforce authentication successful');
+
+    // Return the access token and instance URL
+    return new Response(JSON.stringify({
+      success: true,
+      access_token: authData.access_token,
+      instance_url: authData.instance_url,
+      token_type: authData.token_type
+    }), {
+      status: 200,
+      headers
+    });
+
+  } catch (error) {
+    console.error('Authentication error:', error.message);
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message,
+      details: 'Check your Salesforce credentials in environment variables'
+    }), {
+      status: 200,
+      headers
+    });
+  }
+};
