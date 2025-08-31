@@ -17,7 +17,7 @@ export default async (request, context) => {
       throw new Error('Contact ID is required');
     }
 
-    const authResponse = await fetch(`${request.url.origin}/.netlify/functions/salesforce-auth`, {
+    const authResponse = await fetch(`https://pixelxd-sfdc.netlify.app/.netlify/functions/salesforce-auth`, {
       method: 'POST'
     });
     
@@ -213,3 +213,4 @@ function formatDate(dateString) {
     return 'Invalid date';
   }
 }
+
