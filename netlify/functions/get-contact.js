@@ -20,7 +20,7 @@ export default async (request, context) => {
     // Sanitize input - remove special characters that could break SOQL
     const sanitizedName = contactName.replace(/['"\\]/g, '').trim();
 
-    const authResponse = await fetch(`${request.url.origin}/.netlify/functions/salesforce-auth`, {
+    const authResponse = await fetch(`https://pixelxd-sfdc.netlify.app/.netlify/functions/salesforce-auth`, {
       method: 'POST'
     });
     
@@ -74,3 +74,4 @@ export default async (request, context) => {
     });
   }
 };
+
