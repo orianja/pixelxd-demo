@@ -1,5 +1,4 @@
 export default async (request, context) => {
-  // Set CORS headers for browser requests
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -7,7 +6,6 @@ export default async (request, context) => {
     'Content-Type': 'application/json'
   };
 
-  // Handle preflight OPTIONS request
   if (request.method === 'OPTIONS') {
     return new Response('', { status: 200, headers });
   }
@@ -15,7 +13,7 @@ export default async (request, context) => {
   try {
     const { SF_CLIENT_ID, SF_CLIENT_SECRET, SF_USERNAME, SF_PASSWORD } = process.env;
 
-    // Enhanced environment variable checking with specific missing vars
+    // Enhanced validation
     const missingVars = [];
     if (!SF_CLIENT_ID) missingVars.push('SF_CLIENT_ID');
     if (!SF_CLIENT_SECRET) missingVars.push('SF_CLIENT_SECRET');
@@ -23,19 +21,31 @@ export default async (request, context) => {
     if (!SF_PASSWORD) missingVars.push('SF_PASSWORD');
 
     if (missingVars.length > 0) {
-      throw new Error(`Missing Salesforce environment variables: ${missingVars.join(', ')}`);
+      throw new Error(`Missing variables: ${missingVars.join(', ')}`);
     }
 
-    // Log some debug info (without sensitive data)
-    console.log('Auth attempt:', {
-      username: SF_USERNAME,
-      clientIdLength: SF_CLIENT_ID?.length,
-      passwordLength: SF_PASSWORD?.length,
-      secretLength: SF_CLIENT_SECRET?.length
-    });
+    // Log detailed info for debugging
+    console.log('=== CREDENTIAL ANALYSIS ===');
+    console.log('Username:', SF_USERNAME);
+    console.log('Password length:', SF_PASSWORD?.length);
+    console.log('Password ends with letters/numbers?', /[a-zA-Z0-9]$/.test(SF_PASSWORD));
+    console.log('Client ID length:', SF_CLIENT_ID?.length);
+    console.log('Client ID starts with 3MVG?', SF_CLIENT_ID?.startsWith('3MVG'));
+    console.log('Client Secret length:', SF_CLIENT_SECRET?.length);
+    
+    // Show password structure (safely)
+    if (SF_PASSWORD) {
+      const passwordPart = SF_PASSWORD.substring(0, SF_PASSWORD.length - 20);
+      const possibleToken = SF_PASSWORD.substring(SF_PASSWORD.length - 20);
+      console.log('Password part length:', passwordPart.length);
+      console.log('Possible token part:', possibleToken);
+    }
 
-    // Use your dev instance URL
     const authUrl = 'https://pixelxd2-dev-ed.develop.my.salesforce.com/services/oauth2/token';
+    
+    console.log('Auth URL:', authUrl);
+    console.log('Grant type: password');
+
     const authBody = new URLSearchParams({
       grant_type: 'password',
       client_id: SF_CLIENT_ID,
@@ -44,9 +54,8 @@ export default async (request, context) => {
       password: SF_PASSWORD
     });
 
-    console.log('Attempting Salesforce authentication...');
+    console.log('Making authentication request...');
 
-    // Make authentication request to Salesforce
     const authResponse = await fetch(authUrl, {
       method: 'POST',
       headers: {
@@ -57,52 +66,54 @@ export default async (request, context) => {
 
     const authData = await authResponse.json();
 
+    console.log('Response status:', authResponse.status);
+    console.log('Response headers:', Object.fromEntries(authResponse.headers.entries()));
+
     if (!authResponse.ok) {
-      console.error('Salesforce auth error details:', {
-        status: authResponse.status,
-        statusText: authResponse.statusText,
-        error: authData.error,
-        errorDescription: authData.error_description,
-        fullResponse: authData
-      });
+      console.log('=== SALESFORCE ERROR DETAILS ===');
+      console.log('Full error response:', JSON.stringify(authData, null, 2));
       
-      // Provide more specific error messages
-      let errorMessage = 'Salesforce authentication failed';
+      let detailedError = `Salesforce auth failed (${authResponse.status})`;
+      
       if (authData.error === 'invalid_grant') {
-        errorMessage += ': Invalid username, password, or security token. Make sure your password includes the security token at the end.';
+        detailedError += '\n\nPossible causes:';
+        detailedError += '\n1. Wrong password + security token combination';
+        detailedError += '\n2. Security token expired or not appended correctly';
+        detailedError += '\n3. Username incorrect';
+        detailedError += '\n4. IP restrictions in Salesforce';
       } else if (authData.error === 'invalid_client_id') {
-        errorMessage += ': Invalid Client ID. Check your Connected App settings.';
+        detailedError += '\n\nClient ID is wrong or Connected App not found';
       } else if (authData.error === 'invalid_client') {
-        errorMessage += ': Invalid Client Secret. Check your Connected App settings.';
-      } else {
-        errorMessage += `: ${authData.error_description || authData.error}`;
+        detailedError += '\n\nClient Secret is wrong';
       }
       
-      throw new Error(errorMessage);
+      throw new Error(detailedError);
     }
 
-    console.log('Salesforce authentication successful');
+    console.log('SUCCESS! Authentication worked');
+    console.log('Instance URL:', authData.instance_url);
 
-    // Return the access token and instance URL
     return new Response(JSON.stringify({
       success: true,
       access_token: authData.access_token,
       instance_url: authData.instance_url,
-      token_type: authData.token_type
+      token_type: authData.token_type,
+      debug: 'Authentication successful!'
     }), {
       status: 200,
       headers
     });
 
   } catch (error) {
-    console.error('Authentication error:', error.message);
+    console.error('=== AUTHENTICATION ERROR ===');
+    console.error('Error message:', error.message);
     
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
       timestamp: new Date().toISOString()
     }), {
-      status: 200, // Keep as 200 so the frontend can read the error details
+      status: 200,
       headers
     });
   }
